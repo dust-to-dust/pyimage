@@ -6,7 +6,7 @@ import logging
 
 import lib
 import requests
-from lib.threadpool import ThreadPool
+from .threadpool import ThreadPool
 import os
 from PIL import Image
 from io import BytesIO
