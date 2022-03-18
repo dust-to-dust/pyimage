@@ -9,6 +9,7 @@ from lxml import etree
 from hashlib import md5
 
 
+
 class Parser:
     def __init__(self, proxies=None, ajax: bool = False, cookie=None):
         """
@@ -35,19 +36,27 @@ class Parser:
             self.browser = webdriver.Chrome('./chromedriver.exe')  # 创建浏览器控制对象,并启动浏览器
             self.browser.implicitly_wait(5)  # 最大等待响应时间，对所有操作有效，重新执行间隔0.5s
 
-    def parse(self, url: str = '', xpath: str = '', html: str = '') -> list:
+    def parse(self, url, xpath, html='') -> list:
         assert url or html  # url和html二选一
+        if isinstance(xpath, str):
+            xpath = [xpath]
 
+        imgurls = []
         if self.ajax:
+            assert url
             self.browser.get(url)  # 打开网页
-            return self.browser.find_elements_by_xpath(xpath)
+            for xp in xpath:
+                imgurls.extend(self.browser.find_elements_by_xpath(xp))
         else:
             if not html:
                 html = self.session.get(url=url, timeout=self.timeout).text
-            return etree.HTML(html).xpath(xpath)
+            doc = etree.HTML(html)
+            for xp in xpath:
+                imgurls.extend(doc.xpath(xp))
+        return imgurls
 
-    def parse_img(self, url: str = '', html: str = '') -> list:
-        return self.parse(url, '//img/@src', html)
+    def parse_img(self, url, html: str = '') -> list:
+        return self.parse(url, ['//img/@src', '//img/@data-src'], html)
 
     @staticmethod
     def parse_cookie(cookie: str):

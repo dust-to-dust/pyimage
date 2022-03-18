@@ -1,10 +1,11 @@
 import os
 from shutil import move  # 文件操作
 import time
+import lib
 from selenium import webdriver
-from .threadpool import ThreadPool
-from .downloader import save_file
-from .file_operate import is_img
+from lib.threadpool import ThreadPool
+from lib.downloader import save_file
+from lib.file_operate import is_img
 import requests
 # from collections import deque  # 栈
 from selenium.webdriver.chrome.options import DesiredCapabilities

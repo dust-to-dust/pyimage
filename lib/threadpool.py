@@ -10,7 +10,9 @@ from time import sleep
 from tqdm import tqdm
 
 
-# from sys import exit
+class PoolClosedError(Exception):
+    def __init__(self, err='线程池已经关闭，不能执行提交'):
+        Exception.__init__(self, err)
 
 
 class Thread(t.Thread):
@@ -21,7 +23,6 @@ class Thread(t.Thread):
 
     def run(self):
         # 执行任务中调用exit会结束线程，不会回池
-        # 死循环，从而让创建的线程在一定条件下关闭退出
         task = None
         while 1:
             try:
@@ -54,17 +55,35 @@ class ThreadPool:
             thread.start()
 
     def submit(self, *params):
-        assert params is not None
-        self.tasks.put(params)
-        self.task_count += 1
+        """
 
-    def map(self, *params):
-        # todo
-        assert params is not None
-        self.tasks.put(params)
+        @param params: 任务函数，参数1，参数2，...
+        @return:
+        """
+        if self.is_running:
+            assert params is not None
+            self.tasks.put(params)
+            self.task_count += 1
+        else:
+            raise PoolClosedError()
+
+    def map(self, target, params: list):
+        """
+
+        @param target: 任务函数
+        @param params: [(参数1,参数2,...),(参数1,参数2,...),...]
+        @return:
+        """
+        if self.is_running:
+            assert params is not None
+            for item in params:
+                self.tasks.put(target, *item)
+        else:
+            raise PoolClosedError()
 
     def shutdown_now(self):
         """解决未执行任务发生异常可能导致线程池无法退出问题"""
+        self.retry = 0
         self.tasks.queue.clear()
         self.shutdown()
 
@@ -85,10 +104,12 @@ class ThreadPool:
         return self.exceptions
 
     def task_retry(self):
-        # 等待任务执行完后重试
+        """等待任务执行完后重试"""
+        if self.retry <= 0:
+            return
         while not self.tasks.empty():
-            sleep(2)
-        if self.retry > 0 and len(self.exceptions) > 0:
+            sleep(0.5)
+        if len(self.exceptions) > 0:
             for _ in range(self.retry):
                 exceptions = self.exceptions.copy()
                 self.exceptions.clear()
@@ -100,12 +121,12 @@ class ThreadPool:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # 使用with语法不能返回异常
+        # 使用with语法不能返回只能打印
         if self.is_running:
             self.shutdown()
 
     def print_exceptions(self):
-        print('exceptions:', self.exceptions)
+        print('Exceptions:', self.exceptions)
 
     def set_monitor(self):
         """启动监视线程，需主动调用"""

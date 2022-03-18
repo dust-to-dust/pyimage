@@ -3,50 +3,39 @@
 # Datetime: 2021/8/3 
 # 使用说明: 实例化Downloader然后调用.download
 import logging
+import signal
+
+import PIL
 
 import lib
 import requests
-from .threadpool import ThreadPool
+from lib.threadpool import ThreadPool
 import os
 from PIL import Image
 from io import BytesIO
 import json
 
 
-def save_file(fileurl, filepath):
-    """必须开启vpn专家(无360)模式,解决了urlretrieve 403的问题"""
-    s = requests.Session()
-    s.trust_env = False  # 使用VPN时必须加这句话!!!否则check_hostname requires server_hostname
-    head = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                          'Chrome/92.0.4515.107 Safari/537.36'}
-    res = s.get(fileurl, headers=head)
-    # 直接保存
-    # with open(filepath + '.jpg', 'wb') as fp:
-    #     fp.write(res.content)
-    # PIL不能直接读返回数据，需要将Bytes转IO流
-    im: Image.Image = Image.open(BytesIO(res.content))
-    try:
-        im.save(lib.del_suffix(filepath) + '.jpg', 'jpeg')
-    except OSError:
-        im.save(lib.del_suffix(filepath) + '.png', 'png')
-
-
 class Downloader:
-    def __init__(self, save_to, max_workers=8, set_monitor=True, debug=False):
+    def __init__(self, save_to, max_workers=8, set_monitor=True, debug=False,
+                 min_pixel: int = 300, min_size: int = 100):
         self.debug = debug  # 开启后打印错误信息
         self.max_workers = max_workers
         self.save_to = save_to
         self.success_count = 0
         self.task_count = 0
         self.exist_count = 0
-        self.log = self.setLog()
+        self.min_pixel = min_pixel
+        self.min_size = min_size
         self.close = self.shutdown
 
         with open('下载记录.json', 'r+', encoding='utf-8') as f:
             self.record = json.load(f)
         self.pool = ThreadPool(self.max_workers)
         if set_monitor:
-            self.pool.set_monitor()     # 启动线程池监视(进度条)
+            self.pool.set_monitor()  # 启动线程池监视(进度条)
+
+        signal.signal(signal.SIGINT, self.shutdown_now)
 
         # 检查文件目录
         try:
@@ -60,27 +49,12 @@ class Downloader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.shutdown()
 
-    @staticmethod
-    def setLog():
-        # todo
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
-
-        file_handler = logging.FileHandler(f"日志.log", mode="a+", encoding="utf-8")
-        file_handler.setFormatter(
-            logging.Formatter("[%(asctime)s][%(pathname)s-line:%(lineno)d][%(levelname)s]\n%(funcName)s —— %(message)s")
-        )
-
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(
-            logging.Formatter("[%(levelname)s]\n%(funcName)s —— %(message)s")
-        )
-        stream_handler.setLevel(logging.DEBUG)
-
-        logger.addHandler(file_handler)
-        logger.addHandler(stream_handler)
-
-        return logger
+    def shutdown_now(self):
+        print('\n=========用户强制退出=========')
+        with open('下载记录.json', 'w', encoding='utf-8') as f:
+            json.dump(self.record, f)
+        print(f'本次下载 累计：{self.task_count}，成功：{self.success_count}，已存在：{self.exist_count}')
+        self.pool.shutdown_now()
 
     def shutdown(self):
         """必须调用该函数退出!"""
@@ -100,10 +74,12 @@ class Downloader:
                     print(exc[1])
 
     @staticmethod
-    def url_standardize(url):
+    def url_standardize(url: str):
         """url标准化
         去除url中@/?后字符，间接修正webp和垃圾下载器问题
         """
+        if url[:2] == '//':
+            url = 'https:' + url
         return url.split(sep='?')[0].split(sep='@')[0]
 
     @staticmethod
@@ -117,12 +93,12 @@ class Downloader:
 
     def save_img(self, fileurl):
         """
-        必须开启vpn专家(无360)模式,解决了urlretrieve 403的问题
         优先存为jpg格式，如有透明通道存png
         """
         id_ = self.get_id(fileurl)
+        fileurl = self.url_standardize(fileurl)
         try:
-            # 在索引块record[filename[0]]查找是否下载过，如已下载函数返回
+            # 在索引块record[id_[0]]查找是否下载过，如已下载函数返回(id_[0]是索引)
             if id_ in self.record[id_[0]]:
                 self.exist_count += 1
                 return
@@ -133,9 +109,15 @@ class Downloader:
         s.trust_env = False  # 使用VPN时必须加这句话!!!否则check_hostname requires server_hostname
         head = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                               'Chrome/92.0.4515.107 Safari/537.36'}
-        res = s.get(fileurl, headers=head)
+        res = s.get(fileurl, headers=head)      # 下载
         # PIL不能直接读返回数据，需要将Bytes转IO流
-        im: Image.Image = Image.open(BytesIO(res.content))
+        try:
+            im: Image.Image = Image.open(BytesIO(res.content))
+            if im.width == 0:
+                raise PIL.UnidentifiedImageError
+        except PIL.UnidentifiedImageError:
+            # 下载失败/非图片
+            raise Exception('下载失败或者非图片url')
         try:
             im.save(os.path.join(self.save_to, lib.del_suffix(id_) + '.jpg'), 'jpeg')
         except OSError:
@@ -150,13 +132,12 @@ class Downloader:
             # 只有一个url
             urls = [urls, ]
         assert isinstance(urls, list)
+
         self.task_count += len(urls)
         for fileurl in urls:
-            fileurl = self.url_standardize(fileurl)
             self.pool.submit(self.save_img, fileurl)
         return self
 
 
 if __name__ == '__main__':
     pass
-
