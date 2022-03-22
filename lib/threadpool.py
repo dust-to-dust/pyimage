@@ -5,7 +5,6 @@
 
 import threading as t
 from queue import Queue     # 线程安全，dqueue的高级封装
-from typing import List
 from time import sleep
 from tqdm import tqdm
 
@@ -39,15 +38,14 @@ class Thread(t.Thread):
 
 
 class ThreadPool:
-    def __init__(self, max_workers=8, retry=1, print_exc=True):
+    def __init__(self, max_workers: int = 8, retry: int = 1, print_exc=True):
         self.is_running = True
-        self.timer = None
         self.print_exc = print_exc
         self.retry = retry  # 将发生错误的任务重新执行retry次
         self.tasks = Queue()
         self.task_count = 0  # 总共提交的任务数
         self.exceptions = []  # 发生异常的 任务、参数 以及 异常
-        self.thread_list: List[Thread] = []
+        self.thread_list = []
 
         for _ in range(max_workers):
             thread = Thread(self.tasks, self.exceptions)
@@ -65,6 +63,7 @@ class ThreadPool:
             self.tasks.put(params)
             self.task_count += 1
         else:
+            # 如果线程池已经调用shutdown，再提交任务会导致线程池无法正常退出
             raise PoolClosedError()
 
     def map(self, target, params: list):
@@ -87,7 +86,7 @@ class ThreadPool:
         self.tasks.queue.clear()
         self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self) -> list:
         """
         :return: exceptions -> [[task, e],]  相当于在提交的task后追加了异常e
         """
@@ -133,6 +132,7 @@ class ThreadPool:
         t.Thread(target=self.monitor).start()
 
     def monitor(self):
+        """监视线程：每两秒输出一次线程池状态"""
         # print会打断当前进度条，可以把print(…)语句改写为tqdm.write(…)，来防止这种情况的出现
         with tqdm(desc='线程池执行进度') as bar:
             pre_done = 0

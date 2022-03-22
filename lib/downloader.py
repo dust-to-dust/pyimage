@@ -16,17 +16,32 @@ from io import BytesIO
 import json
 
 
+def save_file(fileurl, filepath):
+    """必须开启vpn专家(无360)模式,解决了urlretrieve 403的问题"""
+    s = requests.Session()
+    s.trust_env = False  # 使用VPN时必须加这句话!!!否则check_hostname requires server_hostname
+    head = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/92.0.4515.107 Safari/537.36'}
+    res = s.get(fileurl, headers=head)
+    # 直接保存
+    # with open(filepath + '.jpg', 'wb') as fp:
+    #     fp.write(res.content)
+    # PIL不能直接读返回数据，需要将Bytes转IO流
+    im: Image.Image = Image.open(BytesIO(res.content))
+    try:
+        im.save(lib.del_suffix(filepath) + '.jpg', 'jpeg')
+    except OSError:
+        im.save(lib.del_suffix(filepath) + '.png', 'png')
+
+
 class Downloader:
-    def __init__(self, save_to, max_workers=8, set_monitor=True, debug=False,
-                 min_pixel: int = 300, min_size: int = 100):
+    def __init__(self, save_to, max_workers=8, set_monitor=True, debug=False):
         self.debug = debug  # 开启后打印错误信息
         self.max_workers = max_workers
         self.save_to = save_to
         self.success_count = 0
         self.task_count = 0
         self.exist_count = 0
-        self.min_pixel = min_pixel
-        self.min_size = min_size
         self.close = self.shutdown
 
         with open('下载记录.json', 'r+', encoding='utf-8') as f:
