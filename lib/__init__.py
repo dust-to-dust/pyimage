@@ -7,5 +7,6 @@ from lib.queue_ import QueueFIFO
 from lib.parse_html import *
 from lib.file_operate import *
 from lib.timer import Timer
+from lib.exif import *
 
 __version__ = '2022-3-21'

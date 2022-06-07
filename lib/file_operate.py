@@ -18,7 +18,7 @@ def del_suffix(filepath):
 
 def is_img(filename):
     ftype = get_suffix(filename)
-    support = ['.jpg', '.png', '.jpeg', '.webp', '.gif', '.heic', '.heif', '.bmp']
+    support = ['.jpg', '.png', '.jpeg', '.webp', '.gif', '.heic', '.heif', '.bmp', '.avif']
     return True if ftype in support else False
 
 

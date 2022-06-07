@@ -9,11 +9,11 @@ from lxml import etree
 from hashlib import md5
 
 
-
 class Parser:
-    def __init__(self, proxies=None, ajax: bool = False, cookie=None):
+    def __init__(self, domain=None, proxies=None, ajax: bool = False, cookie=None):
         """
-        :proxies: 设置代理，eg：{
+        :domain: 用于补全相对链接
+        :proxies: 设置代理，eg(西部世界)：{
             "http": "http://127.0.0.1:21882",
             "https": "http://127.0.0.1:21882",
         }
@@ -21,6 +21,7 @@ class Parser:
         :cookie: cookie字典
         """
         self.timeout = 8
+        self.domain = domain
         self.ajax = ajax
         self.imgurls = []
         self.session = requests.session()
@@ -36,8 +37,18 @@ class Parser:
             self.browser = webdriver.Chrome('./chromedriver.exe')  # 创建浏览器控制对象,并启动浏览器
             self.browser.implicitly_wait(5)  # 最大等待响应时间，对所有操作有效，重新执行间隔0.5s
 
+    def url_standardize(self, url: str):
+        if url[:2] == '//':
+            url = 'https:' + url
+        elif url[0] == '/':
+            url = self.domain + url
+        return url
+
     def parse(self, url, xpath, html='') -> list:
         assert url or html  # url和html二选一
+
+        if url:
+            url = self.url_standardize(url)
         if isinstance(xpath, str):
             xpath = [xpath]
 
