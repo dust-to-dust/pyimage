@@ -13,7 +13,7 @@ from lib.threadpool import ThreadPool
 import os
 from io import BytesIO
 import json
-from PIL import Image, UnidentifiedImageError
+from PIL import UnidentifiedImageError, Image
 
 
 def save_file(fileurl, filepath):
@@ -55,8 +55,12 @@ class Downloader:
         elif img_format == 'jpg':
             self.img_format = 'jpeg'
 
+        if not os.path.exists('下载记录.json'):
+            with open('下载记录.json', 'w', encoding='utf-8') as f:
+                json.dump({}, f)
         with open('下载记录.json', 'r+', encoding='utf-8') as f:
             self.record = json.load(f)
+
         self.pool = ThreadPool(self.max_workers)
         if set_monitor:
             self.pool.set_monitor()  # 启动线程池监视(进度条)
@@ -75,7 +79,7 @@ class Downloader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.shutdown()
 
-    def shutdown_now(self):
+    def shutdown_now(self, *parms):
         print('\n=========用户强制退出=========')
         with open('下载记录.json', 'w', encoding='utf-8') as f:
             json.dump(self.record, f)
@@ -128,7 +132,7 @@ class Downloader:
             # 下载失败/非图片
             raise Exception('下载失败或者非图片url')
 
-        dhash = im.dhash()
+        dhash = lib.dhash(im)
         filepath = os.path.join(self.save_to, dhash)
 
         try:

@@ -8,5 +8,6 @@ from lib.parse_html import *
 from lib.file_operate import *
 from lib.timer import Timer
 from lib.exif import *
+from lib.dHash import dhash, cal_hamming_distance
 
-__version__ = '2022-3-21'
+__version__ = '2022-6-8'

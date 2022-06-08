@@ -72,7 +72,7 @@ def parse_article(uid=0, article_url='', pages=10) -> list:
 if __name__ == '__main__':
     with lib.Downloader('./bili', debug=True) as d:
         parser = lib.Parser()
-        d.download(parser.parse_img('https://www.bilibili.com/read/cv7728476'))     # 解析专栏子页
-        d.download(parse_article(uid=414702361))   # 通过uid解析专栏
-        d.download(parse_dynamic(dynamic_url='https://space.bilibili.com/610810838/dynamic'))   # 通过url解析动态
+        d.download(parser.parse_img('https://www.bilibili.com/read/cv15769860'))     # 解析专栏子页
+        d.download(parse_article(uid=1567748478))   # 通过uid解析专栏
+        d.download(parse_dynamic(dynamic_url='https://space.bilibili.com/1567748478/dynamic'))   # 通过url解析动态
 
